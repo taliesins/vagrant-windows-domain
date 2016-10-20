@@ -8,24 +8,26 @@ function Test-JoinedToADomain(){
 	return $computerSystem.PartOfDomain
 }
 
-function Remove-ADComputerFromDomain($computerName, $domain, $username, $password){
-	$ADSISearcher = New-Object System.DirectoryServices.DirectorySearcher
-	$ADSISearcher.Filter = '(&(name=' + $computerName + ')(objectClass=computer))'
-	$ADSISearcher.SearchScope = 'Subtree';
-	$computer = $ADSISearcher.FindOne();
+function Remove-ADComputerFromDomain($computerName, $username, $password){
+	$securePassword = convertto-securestring -string $password -AsPlainText -Force
+	$credentials = new-object -typename System.Management.Automation.PSCredential -argumentlist "$domain\$username",$securePassword
 
-    if ($computer){
-        $directoryEntry = New-Object System.DirectoryServices.DirectoryEntry($computer.Path, "$domain\$username", $password)
+	$job = Start-Job -Credential $credentials -ScriptBlock {
+		$ADSISearcher = New-Object System.DirectoryServices.DirectorySearcher
+		$ADSISearcher.Filter = '(&(name=' + $args[0] + ')(objectClass=computer))'
+		$ADSISearcher.SearchScope = 'Subtree';
+		$computer = $ADSISearcher.FindOne();
+		if ($computer){
+			$directoryEntry = $computer.GetDirectoryEntry()
+			if ($directoryEntry){
+				Write-Host "Computer with name $($args[0]) exists in AD, so removing it"
+				$directoryEntry.DeleteTree()
+			}
+		}
+	} -ArgumentList $computerName
 
-        $searcher = New-Object System.DirectoryServices.DirectorySearcher($directoryEntry)
-        $computer2 = $searcher.FindOne()
-        if ($computer2){
-            $directoryEntry2 = $computer2.GetDirectoryEntry()
-            if ($directoryEntry2){
-                $directoryEntry2.DeleteTree()
-            }
-        }       
-    }
+	Wait-Job $job
+	Receive-Job $job
 }
 
 function Repair-OpenSSHPasswd(){
@@ -50,15 +52,18 @@ $credentials = New-Object System.Management.Automation.PSCredential ($username, 
 if (Test-PartOfDomain -computerName $computerName -domain $domain){
 	throw "$computerName already part of domain $domain"
 } else {
-	#This situation occurs when someone shuts down computer and deletes it, without removing it from domain. Then spins up an instance with the same name
-	try{
-		Remove-ADComputerFromDomain -computerName $computerName -domain $domain -username $username -password $password
-	} catch {
-		Write-Host 'Unable to check and remove if computer with same name is added to AD already'
-	}
 
-	#Add computer to domain and rename if necessary
-	Add-Computer <%= options[:parameters] %> -Verbose -Force -PassThru
+	try{
+		#Add computer to domain and rename if necessary
+		Add-Computer <%= options[:add_parameters] %> -Verbose -Force -PassThru
+	} catch {
+		#This situation occurs when someone shuts down computer and deletes it, without removing it from domain. Then spins up an instance with the same name.
+		#Once we are part of domain we can remove the machine name that we want to use
+		Remove-ADComputerFromDomain -computerName $computerName -username $username -password $password
+		Remove-Computer <%= options[:leave_parameters] %> -Workgroup 'WORKGROUP' -Verbose -Force -PassThru
+
+		Add-Computer <%= options[:add_parameters] %> -Verbose -Force -PassThru
+	}
 	Repair-OpenSSHPasswd
 
 	# Fix vagrant-windows GH-129, if there's an existing scheduled
@@ -72,7 +77,7 @@ if (Test-PartOfDomain -computerName $computerName -domain $domain){
 if (!(Test-JoinedToADomain)) {
 	Throw "$computerName not part of any domain"
 } else {
-	Remove-Computer <%= options[:parameters] %> -Workgroup 'WORKGROUP' -Verbose -Force -PassThru
+	Remove-Computer <%= options[:leave_parameters] %> -Workgroup 'WORKGROUP' -Verbose -Force -PassThru
 	Repair-OpenSSHPasswd
 
 	# Fix vagrant-windows GH-129, if there's an existing scheduled

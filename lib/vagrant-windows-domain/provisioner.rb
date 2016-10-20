@@ -213,7 +213,8 @@ module VagrantPlugins
             ou_path: @config.ou_path,
             add_to_domain: add_to_domain,
             unsecure: @config.unsecure,
-            parameters: generate_command_arguments(add_to_domain)
+            add_parameters: generate_command_arguments(true),
+            leave_parameters: generate_command_arguments(false)
         })
       end
 
