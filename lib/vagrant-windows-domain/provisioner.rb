@@ -44,7 +44,7 @@ module VagrantPlugins
       #
       # @param [Config] root_config The default configuration from the Vagrant hierarchy.
       def configure(root_config)
-        raise WindowsDomainError, :unsupported_platform if !windows?
+        raise WindowsDomainError, :unsupported_platform unless windows?
       end
 
 
@@ -132,14 +132,14 @@ module VagrantPlugins
       # Get username/password from user if not provided
       # as part of the config.
       def set_credentials
-        if (config.username == nil)
+        if config.username == nil
           @logger.info("==> Requesting username as none provided")
           config.username = @machine.env.ui.ask("Please enter your domain username: ")
         else
           @logger.info("==> Using domain username: #{config.username}")
         end
 
-        if (config.password == nil)
+        if config.password == nil
           @logger.info("==> Requesting password as none provided")
           config.password = @machine.env.ui.ask("Please enter your domain password (output will be hidden): ", {:echo => false})
         end
@@ -152,7 +152,7 @@ module VagrantPlugins
       # to be cleaned up.
       def destroy
         if @config && @config.domain != nil
-          if is_joined_to_domain()
+          if is_joined_to_domain
             set_credentials
             result = leave_domain
             if result
@@ -162,7 +162,6 @@ module VagrantPlugins
           end
         else
           @logger.debug("Not leaving domain on `destroy` action - no valid configuration detected")
-          return
         end
       end
 
@@ -245,7 +244,7 @@ module VagrantPlugins
           end
         else
           params = {}
-          if !@config.unsecure
+          unless @config.unsecure
             params["-UnjoinDomainCredential $credentials"] = nil
           end
         end
@@ -299,13 +298,13 @@ module VagrantPlugins
         new_line = ""
         error = false
         machine.communicate.sudo("powershell -ExecutionPolicy Bypass -OutputFormat Text -file #{script_path}", opts) do |type, data|
-          if !data.chomp.empty?
+          unless data.chomp.empty?
             error = true if type == :stderr
             if [:stderr, :stdout].include?(type)
               color = type == :stdout ? :green : :red
               new_line = "\r\n" if last_type != nil and last_type != type
               last_type = type
-              @machine.ui.info( new_line + data.chomp, color: color, new_line: false, prefix: false)
+              @machine.ui.info(new_line + data.chomp, color: color, new_line: false, prefix: false)
             end
           end
         end
@@ -317,7 +316,7 @@ module VagrantPlugins
       def get_guest_computer_name(machine)
         computerName = ""
         machine.communicate.shell.powershell("$env:COMPUTERNAME") do |type, data|
-          if !data.chomp.empty?
+          unless data.chomp.empty?
             if [:stderr, :stdout].include?(type)
               computerName = data.chomp
               @logger.info("Detected guest computer name: #{computerName}")
