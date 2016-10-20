@@ -8,6 +8,26 @@ function Test-JoinedToADomain(){
 	return $computerSystem.PartOfDomain
 }
 
+function Remove-ADComputerFromDomain($computerName, $domain, $username, $password){
+	$ADSISearcher = New-Object System.DirectoryServices.DirectorySearcher
+	$ADSISearcher.Filter = '(&(name=' + $computerName + ')(objectClass=computer))'
+	$ADSISearcher.SearchScope = 'Subtree';
+	$computer = $ADSISearcher.FindOne();
+
+    if ($computer){
+        $directoryEntry = New-Object System.DirectoryServices.DirectoryEntry($computer.Path, "$domain\$username", $password)
+
+        $searcher = New-Object System.DirectoryServices.DirectorySearcher($directoryEntry)
+        $computer2 = $searcher.FindOne()
+        if ($computer2){
+            $directoryEntry2 = $computer2.GetDirectoryEntry()
+            if ($directoryEntry2){
+                $directoryEntry2.DeleteTree()
+            }
+        }       
+    }
+}
+
 function Repair-OpenSSHPasswd(){
 	$passwdPath = 'C:\Program Files\OpenSSH\etc\passwd'
 	$mkpasswdPath = 'C:\Program Files\OpenSSH\bin\mkpasswd.exe'
@@ -30,6 +50,14 @@ $credentials = New-Object System.Management.Automation.PSCredential ($username, 
 if (Test-PartOfDomain -computerName $computerName -domain $domain){
 	throw "$computerName already part of domain $domain"
 } else {
+	#This situation occurs when someone shuts down computer and deletes it, without removing it from domain. Then spins up an instance with the same name
+	try{
+		Remove-ADComputerFromDomain -computerName $computerName -domain $domain -username $username -password $password
+	} catch {
+		Write-Host 'Unable to check and remove if computer with same name is added to AD already'
+	}
+
+	#Add computer to domain and rename if necessary
 	Add-Computer <%= options[:parameters] %> -Verbose -Force -PassThru
 	Repair-OpenSSHPasswd
 
