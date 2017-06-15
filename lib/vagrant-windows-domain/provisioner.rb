@@ -172,10 +172,9 @@ module VagrantPlugins
         options[:provision_ignore_sentinel] = false
         options[:lock] = false
         @machine.action(:reload, options)
-
         Timeout.timeout(@machine.config.vm.boot_timeout) do
           begin
-            sleep 5
+            sleep @restart_sleep_duration
           end until @machine.communicate.ready?
         end
       end
@@ -204,6 +203,10 @@ module VagrantPlugins
       def generate_command_runner_script(add_to_domain=true)
         path = File.expand_path("../templates/runner.ps1", __FILE__)
 
+        if @config.computer_name != nil && @old_computer_name != nil && @config.computer_name.casecmp(@old_computer_name) != 0
+          @config.rename = true
+        end
+        
         Vagrant::Util::TemplateRenderer.render(path, options: {
             config: @config,
             username: @config.username,
@@ -213,11 +216,24 @@ module VagrantPlugins
             ou_path: @config.ou_path,
             add_to_domain: add_to_domain,
             unsecure: @config.unsecure,
+            rename: @config.rename,
             add_parameters: generate_command_arguments(true),
             leave_parameters: generate_command_arguments(false)
+        }, options_rename: {
+            parameters: generate_command_arguments_rename
         })
       end
 
+      # Generates the argument list for rename 
+      def generate_command_arguments_rename
+
+        params = {"-NewName" => @config.computer_name}
+        params["-DomainCredential $credentials"] = nil
+        join_params = @config.join_options.map { |a| "#{a}" }.join(',')
+        params.map { |k,v| "#{k}" + (!v.nil? ? " #{v}": '') }.join(' ') + join_params
+        
+      end
+      
       # Generates the argument list
       def generate_command_arguments(add_to_domain=true)
 

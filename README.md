@@ -28,7 +28,7 @@ config.vm.provision :windows_domain do |domain|
 
     # The new Computer Name to use when joining the domain.
     #
-    # Uses the Rename-Computer PowerShell command. ORRRR -NewName flag??
+    # Uses the Rename-Computer PowerShell command.
     # Specifies a new name for the computer in the new domain.
     domain.computer_name = "myfandangledname"
 
@@ -73,6 +73,43 @@ This is a great real-life example to get you on your way.
 ### Supported Environments
 
 Currently the plugin supports any Windows environment with Powershell 3+ installed (2008r2, 2012r2 should work nicely).
+
+## Development
+
+Before getting started, read the Vagrant plugin [development basics](https://docs.vagrantup.com/v2/plugins/development-basics.html) and [packaging](https://docs.vagrantup.com/v2/plugins/packaging.html) documentation.
+
+You will need Ruby 2.1.5 and Bundler v1.12.5 installed before proceeding.
+
+_NOTE_: it _must_ be bundler v1.12.5 due to a hard dependency in Vagrant at this time.
+
+```
+git clone git@github.com:mefellows/vagrant-dsc.git
+cd vagrant-dsc
+bundle install
+```
+
+Run tests:
+```
+bundle exec rake spec
+```
+
+Run Vagrant in context of current vagrant-dsc plugin:
+```
+cd <directory>
+bundle exec vagrant up
+```
+
+There is a test Vagrant DSC setup in `./development` that is a good example of a simple acceptance test.
+
+### Multiple Bundlers?
+
+If you have multiple Bundler versions, you can still use 1.12.5 with the following:
+
+```
+bundle _1.12.5_ <command>
+```
+
+e.g. `bundle _1.12.5_ exec rake spec`
 
 ## Uninstallation
 
