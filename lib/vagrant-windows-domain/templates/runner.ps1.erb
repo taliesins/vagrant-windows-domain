@@ -33,10 +33,21 @@ function Remove-ADComputerFromDomain($computerName, $username, $password){
 function Repair-OpenSSHPasswd(){
 	$passwdPath = 'C:\Program Files\OpenSSH\etc\passwd'
 	$mkpasswdPath = 'C:\Program Files\OpenSSH\bin\mkpasswd.exe'
+
+	$groupPath = 'C:\Program Files\OpenSSH\etc\group'
+	$mkgroupPath = 'C:\Program Files\OpenSSH\bin\mkgroup.exe'
+
 	if ((Test-Path $passwdPath) -and (Test-Path $mkpasswdPath)){
-		$passwd = &$mkpasswdPath
-		$passwd = $passwd -replace '^([^+]*\+)', ''
+		#By leaving the machine name prefix in, you can connect via AD and non AD with the same username i.e. format of MACHINENAME+username
+		$passwd = &$mkpasswdPath -L
 		$passwd | Set-Content $passwdPath -Encoding Ascii
+
+		if ((Test-Path $groupPath) -and (Test-Path $mkgroupPath)){
+			$group = &$groupPath -L
+			$group | Set-Content $groupPath -Encoding Ascii
+		}
+
+		get-service | ?{$_.Name -eq 'OpenSSHd'} | restart-service
 	}
 }
 
